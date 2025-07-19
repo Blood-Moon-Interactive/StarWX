@@ -17,7 +17,22 @@ class WeatherService {
       
       if (isUSLocation) {
         console.log('Using NWS API for US location');
-        return await this.getNWSWeatherData(lat, lon);
+        try {
+          const nwsData = await this.getNWSWeatherData(lat, lon);
+          console.log('NWS data received:', nwsData);
+          
+          // Check if NWS data seems reasonable (temperature between -20 and 120°F)
+          const tempF = nwsData.current.temperature?.value;
+          if (tempF && tempF >= -20 && tempF <= 120) {
+            return nwsData;
+          } else {
+            console.warn('NWS temperature seems unreasonable, trying WeatherAPI.com as fallback');
+            return await this.getWeatherApiData(lat, lon);
+          }
+        } catch (nwsError) {
+          console.warn('NWS API failed, trying WeatherAPI.com as fallback:', nwsError);
+          return await this.getWeatherApiData(lat, lon);
+        }
       } else {
         console.log('Using WeatherAPI.com for international location');
         return await this.getWeatherApiData(lat, lon);
@@ -189,6 +204,8 @@ class WeatherService {
       temperature = (parseFloat(currentData.temp_f) - 32) * 5/9;
     }
     
+    console.log('Parsed temperature in Celsius:', temperature);
+    
     // Ensure temperature is reasonable (between -50 and +60°C)
     if (temperature < -50 || temperature > 60) {
       console.warn('Unreasonable temperature detected:', temperature, '°C, using fallback');
@@ -227,10 +244,18 @@ class WeatherService {
   async getNWSCurrentConditions(stationsUrl, location = null) {
     try {
       const stationsResponse = await this.makeNWSRequest(stationsUrl);
+      console.log('NWS Stations response:', stationsResponse);
+      
       if (stationsResponse.features && stationsResponse.features.length > 0) {
         const nearestStation = stationsResponse.features[0];
+        console.log('Nearest station:', nearestStation.properties);
+        
         const observationsUrl = `${this.nwsBaseUrl}/stations/${nearestStation.properties.stationIdentifier}/observations/latest`;
+        console.log('Observations URL:', observationsUrl);
+        
         const observationsResponse = await this.makeNWSRequest(observationsUrl);
+        console.log('NWS Observations response:', observationsResponse);
+        
         return this.parseNWSCurrentConditions(observationsResponse, location);
       }
     } catch (error) {
@@ -276,6 +301,7 @@ class WeatherService {
     const observation = observationsData.properties;
     
     // Debug temperature data
+    console.log('NWS Observation data:', observation);
     console.log('Temperature data:', observation.temperature);
     console.log('Location for unit conversion:', location);
     
@@ -298,6 +324,8 @@ class WeatherService {
   convertTemperature(value, unitCode, location = null) {
     if (value === null || value === undefined) return null;
     
+    console.log('Raw temperature value:', value, 'unitCode:', unitCode);
+    
     // First convert to Celsius
     let celsius;
     if (unitCode === 'wmoUnit:degC') {
@@ -307,24 +335,23 @@ class WeatherService {
     } else if (unitCode === 'wmoUnit:degF') {
       celsius = (value - 32) * 5/9;
     } else {
-      celsius = value; // Default assumption: value is in Celsius
+      // Default assumption: value is in Celsius (NWS API typically returns Celsius)
+      celsius = value;
     }
     
-    // Determine if location uses Fahrenheit (US locations)
-    const useFahrenheit = this.shouldUseFahrenheit(location);
+    console.log('Temperature in Celsius:', celsius);
     
-    if (useFahrenheit) {
-      const fahrenheit = (celsius * 9/5) + 32;
-      return {
-        value: Math.round(fahrenheit * 10) / 10,
-        unit: '°F'
-      };
-    } else {
-      return {
-        value: Math.round(celsius * 10) / 10,
-        unit: '°C'
-      };
-    }
+    // For US locations, we want to display in Fahrenheit
+    // But we should return both Celsius and Fahrenheit for the dual display
+    const fahrenheit = (celsius * 9/5) + 32;
+    
+    console.log('Temperature in Fahrenheit:', fahrenheit);
+    
+    // Return the original unit for the API, but we'll handle display in main.js
+    return {
+      value: Math.round(celsius * 10) / 10,
+      unit: '°C' // NWS API returns Celsius, so we keep it as Celsius
+    };
   }
 
   // Determine if location should use Fahrenheit

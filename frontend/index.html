@@ -76,10 +76,10 @@
       <!-- Unified Astronomical Data Panel -->
       <section id="astronomicalData" class="py-5 bg-light" style="display: none;">
         <div class="container">
-          <div class="row">
-            <div class="col-lg-3">
-              <!-- Date Range Filter -->
-              <div class="card mb-4">
+          <!-- Date Range Filter - Now at the top -->
+          <div class="row mb-4">
+            <div class="col-lg-4 mx-auto">
+              <div class="card">
                 <div class="card-header bg-primary text-white">
                   <h6 class="card-title mb-0">
                     <i class="bi bi-calendar-range"></i> Date Range
@@ -109,13 +109,16 @@
                 </div>
               </div>
             </div>
-            
-            <div class="col-lg-9">
-              <!-- Weather Summary -->
-              <div class="card mb-4">
+          </div>
+          
+          <!-- Compact Single-Viewport Layout -->
+          <div class="row">
+            <!-- Weather & Viewing Conditions -->
+            <div class="col-lg-4">
+              <div class="card h-100">
                 <div class="card-header bg-info text-white">
                   <h6 class="card-title mb-0">
-                    <i class="bi bi-cloud-sun"></i> Current Weather & Viewing Conditions
+                    <i class="bi bi-cloud-sun"></i> Weather & Viewing
                   </h6>
                 </div>
                 <div class="card-body">
@@ -127,13 +130,62 @@
                   </div>
                 </div>
               </div>
-              
-              <!-- Unified Content Display -->
+            </div>
+            
+            <!-- Astronomical Timing -->
+            <div class="col-lg-4">
+              <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                  <h6 class="card-title mb-0">
+                    <i class="bi bi-sunrise"></i> Best Viewing Times
+                  </h6>
+                </div>
+                <div class="card-body">
+                  <div id="sunriseDisplay">
+                    <div class="text-center py-3">
+                      <i class="bi bi-sunrise text-muted"></i>
+                      <p class="text-muted mb-0">Loading timing data...</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- ISS & Events -->
+            <div class="col-lg-4">
+              <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                  <h6 class="card-title mb-0">
+                    <i class="bi bi-satellite"></i> ISS & Events
+                  </h6>
+                </div>
+                <div class="card-body">
+                  <div id="issStatus">
+                    <div class="text-center py-3">
+                      <i class="bi bi-satellite text-muted"></i>
+                      <p class="text-muted mb-0">Loading ISS data...</p>
+                    </div>
+                  </div>
+                  <hr class="my-3">
+                  <div id="astronomicalEvents">
+                    <div class="text-center py-3">
+                      <i class="bi bi-stars text-muted"></i>
+                      <p class="text-muted mb-0">Loading events...</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Additional content below (launches, etc.) -->
+          <div class="row mt-4">
+            <div class="col-12">
               <div id="dashboardContent">
                 <div class="text-center py-5">
-                  <i class="bi bi-stars display-4 text-muted"></i>
-                  <h4 class="mt-3 text-muted">Set Your Location</h4>
-                  <p class="text-muted">Enter your location above to see what's visible in your night sky</p>
+                  <i class="bi bi-rocket display-4 text-muted"></i>
+                  <h4 class="mt-3 text-muted">Space Launches</h4>
+                  <p class="text-muted">Enter your location and set a date range to see planned space launches</p>
                 </div>
               </div>
             </div>

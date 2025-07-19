@@ -2,12 +2,16 @@
 import { NASAService } from './nasaService.js';
 import { WeatherService } from './weatherService.js';
 import ISSService from './issService.js';
+import SunriseService from './sunriseService.js';
+import './copernicusService.js';
 
 class StarWXApp {
   constructor() {
     this.nasaService = new NASAService();
     this.weatherService = new WeatherService();
     this.issService = new ISSService();
+    this.sunriseService = new SunriseService();
+    this.copernicusService = new CopernicusService();
     this.currentLocation = null;
     
     this.init();
@@ -16,6 +20,9 @@ class StarWXApp {
   async init() {
     console.log('StarWX App initializing...');
     
+    // Prevent any automatic scrolling
+    this.preventAutoScroll();
+    
     // Initialize event listeners
     this.setupEventListeners();
     
@@ -23,6 +30,21 @@ class StarWXApp {
     await this.loadDashboardData();
     
     console.log('StarWX App initialized successfully');
+  }
+
+  preventAutoScroll() {
+    // Prevent automatic scrolling to hash fragments
+    if (window.location.hash) {
+      history.replaceState(null, null, window.location.pathname);
+    }
+    
+    // Prevent scroll restoration
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
+    
+    // Ensure page starts at top
+    window.scrollTo(0, 0);
   }
 
   setupEventListeners() {
@@ -67,6 +89,10 @@ class StarWXApp {
   async getUserLocation() {
     try {
       console.log('Getting user location...');
+      
+      // Show loading state
+      this.showSearchLoading(true);
+      
       const position = await this.getCurrentPosition();
       this.currentLocation = {
         lat: position.coords.latitude,
@@ -83,15 +109,21 @@ class StarWXApp {
       // Update location status
       this.updateLocationStatus();
       
-      // Load weather for current location
+      // Load weather, sunrise, and environmental data for current location
       await this.loadWeatherData();
+      await this.loadSunriseData();
+      await this.loadEnvironmentalData();
       
       // Show astronomical data panel and load data
       this.showAstronomicalDataPanel();
       await this.loadDashboardData();
       
+      // Hide loading state
+      this.showSearchLoading(false);
+      
     } catch (error) {
       console.error('Error getting location:', error);
+      this.showSearchLoading(false);
       this.showMessage('Unable to get your location. Please enter it manually.', 'warning');
     }
   }
@@ -144,17 +176,14 @@ class StarWXApp {
     try {
       console.log('Geocoding location:', location);
       
-      // Show loading state
-      const locationInput = document.getElementById('locationInput');
-      if (locationInput) {
-        locationInput.disabled = true;
-        locationInput.placeholder = 'Searching...';
-      }
+      // Show loading state with spinner
+      this.showSearchLoading(true);
       
       // Geocode the location using Nominatim API
       const coordinates = await this.geocodeLocation(location);
       
       if (!coordinates) {
+        this.showSearchLoading(false);
         this.showMessage('Location not found. Please try a different search term.', 'warning');
         return;
       }
@@ -162,17 +191,19 @@ class StarWXApp {
       this.currentLocation = coordinates;
       
       // Update location input with the found location name
+      const locationInput = document.getElementById('locationInput');
       if (locationInput) {
         locationInput.value = coordinates.displayName || location;
-        locationInput.disabled = false;
         locationInput.placeholder = 'Enter location...';
       }
       
       // Update location status
       this.updateLocationStatus();
       
-      // Load weather for the geocoded location
+      // Load weather, sunrise, and environmental data for the geocoded location
       await this.loadWeatherData();
+      await this.loadSunriseData();
+      await this.loadEnvironmentalData();
       
       // Show astronomical data panel and load data
       this.showAstronomicalDataPanel();
@@ -180,14 +211,8 @@ class StarWXApp {
       
     } catch (error) {
       console.error('Error handling location search:', error);
+      this.showSearchLoading(false);
       this.showMessage('Error processing location. Please try again.', 'error');
-      
-      // Reset input state
-      const locationInput = document.getElementById('locationInput');
-      if (locationInput) {
-        locationInput.disabled = false;
-        locationInput.placeholder = 'Enter location...';
-      }
     }
   }
 
@@ -293,6 +318,44 @@ class StarWXApp {
     }
   }
 
+  async loadSunriseData() {
+    if (!this.currentLocation) {
+      console.log('No location set, skipping sunrise data load');
+      return;
+    }
+    
+    try {
+      console.log('Loading sunrise data for location:', this.currentLocation);
+      const sunriseData = await this.sunriseService.fetchSunriseData(
+        this.currentLocation.lat,
+        this.currentLocation.lon
+      );
+      
+      console.log('Sunrise data received:', sunriseData);
+      
+      if (sunriseData) {
+        this.updateSunriseDisplay(sunriseData);
+      } else {
+        console.warn('No sunrise data received');
+      }
+    } catch (error) {
+      console.error('Error loading sunrise data:', error);
+    }
+  }
+
+  async loadEnvironmentalData() {
+    try {
+      console.log('Loading environmental data from Copernicus...');
+      const environmentalData = await this.copernicusService.getEnvironmentalData();
+      
+      if (environmentalData) {
+        this.updateEnvironmentalDisplay(environmentalData);
+      }
+    } catch (error) {
+      console.error('Error loading environmental data:', error);
+    }
+  }
+
   updateWeatherDisplay(weatherData) {
     const weatherDisplay = document.getElementById('weatherDisplay');
     const weatherSummary = document.getElementById('weatherSummary');
@@ -301,10 +364,6 @@ class StarWXApp {
     
     // Round humidity to 1 decimal place
     const roundedHumidity = Math.round(weatherData.humidity * 10) / 10;
-    
-
-    
-
     
     // Get current date range for display
     const dateRangeSelect = document.getElementById('dateRangeSelect');
@@ -332,29 +391,31 @@ class StarWXApp {
       }
     }
     
-    // Update weather summary in data panel
+    // Update weather summary with ultra-compact view for single viewport
     if (weatherSummary) {
       weatherSummary.innerHTML = `
-        <div class="row">
-          <div class="col-md-6">
-            <div class="text-center">
-              <h4 class="mb-2">${weatherData.temperatureFahrenheit}°F / ${weatherData.temperatureCelsius}°C</h4>
-              <p class="mb-2">${weatherData.description}</p>
-              <span class="badge ${this.getViewingConditionClass(weatherData)} mb-2">
-                ${this.getViewingConditionText(weatherData)}
-              </span>
-              <div class="small text-muted mt-2">
-                <i class="bi bi-calendar"></i> ${dateRangeText}
-              </div>
-            </div>
+        <div class="text-center mb-3">
+          <h4 class="mb-2">${weatherData.temperatureFahrenheit}°F</h4>
+          <p class="mb-2 small">${weatherData.description}</p>
+          <span class="badge ${this.getViewingConditionClass(weatherData)} mb-3">
+            ${this.getViewingConditionText(weatherData)}
+          </span>
+        </div>
+        <div class="row text-center">
+          <div class="col-4 mb-2">
+            <i class="bi bi-cloud text-info fs-5"></i>
+            <div class="small"><strong>${weatherData.cloudCover}%</strong></div>
+            <div class="small text-muted">Clouds</div>
           </div>
-          <div class="col-md-6">
-            <div class="small">
-              <div class="mb-1"><strong>Humidity:</strong> ${roundedHumidity}%</div>
-              <div class="mb-1"><strong>Wind:</strong> ${weatherData.windSpeed} km/h</div>
-              <div class="mb-1"><strong>Visibility:</strong> ${weatherData.visibility} km</div>
-              <div class="mb-1"><strong>Cloud Cover:</strong> ${weatherData.cloudCover}%</div>
-            </div>
+          <div class="col-4 mb-2">
+            <i class="bi bi-droplet text-primary fs-5"></i>
+            <div class="small"><strong>${roundedHumidity}%</strong></div>
+            <div class="small text-muted">Humidity</div>
+          </div>
+          <div class="col-4 mb-2">
+            <i class="bi bi-wind text-success fs-5"></i>
+            <div class="small"><strong>${weatherData.windSpeed}</strong></div>
+            <div class="small text-muted">Wind</div>
           </div>
         </div>
       `;
@@ -372,6 +433,127 @@ class StarWXApp {
     if (weatherData.cloudCover < 20) return 'Excellent Viewing';
     if (weatherData.cloudCover < 50) return 'Good Viewing';
     return 'Poor Viewing';
+  }
+
+  updateSunriseDisplay(sunriseData) {
+    console.log('Updating sunrise display with data:', sunriseData);
+    
+    const observationPlan = this.sunriseService.getObservationPlan();
+    const currentPhase = this.sunriseService.getCurrentPhase();
+    const stargazingRecommendation = this.sunriseService.getStargazingRecommendation();
+    
+    console.log('Observation plan:', observationPlan);
+    console.log('Current phase:', currentPhase);
+    console.log('Stargazing recommendation:', stargazingRecommendation);
+    
+    if (!observationPlan || !currentPhase) {
+      console.warn('Missing observation plan or current phase data');
+      return;
+    }
+    
+    // Create ultra-compact sunrise display HTML for single viewport
+    const sunriseHTML = `
+      <div class="text-center mb-3">
+        <div class="fs-2 mb-2">${currentPhase.icon}</div>
+        <h6 class="mb-2">${currentPhase.description}</h6>
+        ${stargazingRecommendation ? `
+          <div class="mb-3">
+            <small class="text-muted">
+              <i class="bi bi-stars"></i> ${stargazingRecommendation.message}
+            </small>
+          </div>
+        ` : ''}
+      </div>
+      <div class="row text-center">
+        <div class="col-6 mb-2">
+          <div class="small">
+            <strong>Sunrise</strong><br>
+            ${observationPlan.sunrise}
+          </div>
+        </div>
+        <div class="col-6 mb-2">
+          <div class="small">
+            <strong>Sunset</strong><br>
+            ${observationPlan.sunset}
+          </div>
+        </div>
+        <div class="col-6 mb-2">
+          <div class="small">
+            <strong>Best Viewing</strong><br>
+            ${observationPlan.astronomicalTwilightEnd}
+          </div>
+        </div>
+        <div class="col-6 mb-2">
+          <div class="small">
+            <strong>Day Length</strong><br>
+            ${observationPlan.dayLength}
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Find sunrise display container (now in the HTML structure)
+    let sunriseContainer = document.getElementById('sunriseDisplay');
+    if (!sunriseContainer) {
+      console.warn('Could not find sunriseDisplay container');
+      return;
+    }
+    
+    if (sunriseContainer) {
+      sunriseContainer.innerHTML = sunriseHTML;
+      console.log('Updated sunrise display with HTML');
+      
+      // Force a reflow to ensure the display is visible
+      sunriseContainer.style.display = 'block';
+      sunriseContainer.offsetHeight; // Trigger reflow
+    } else {
+      console.warn('Could not find or create sunrise display container');
+    }
+  }
+
+  updateEnvironmentalDisplay(environmentalData) {
+    console.log('Updating environmental display with data:', environmentalData);
+    
+    const recommendations = this.copernicusService.generateStargazingRecommendations(environmentalData);
+    const insights = this.copernicusService.generateStargazingInsights(environmentalData);
+    
+    if (recommendations.length === 0) {
+      console.log('No environmental data available');
+      return;
+    }
+    
+    // Create compact environmental insights for the main weather card
+    const environmentalInsights = insights.slice(0, 2).map(insight => `
+      <div class="col-6 mb-2">
+        <div class="text-center">
+          <div class="small text-muted">${insight.icon} ${insight.type}</div>
+          <div class="small"><strong>${insight.confidence}</strong></div>
+        </div>
+      </div>
+    `).join('');
+    
+    // Add environmental insights to the weather summary if available
+    const weatherSummary = document.getElementById('weatherSummary');
+    if (weatherSummary && environmentalInsights) {
+      const currentContent = weatherSummary.innerHTML;
+      const environmentalSection = `
+        <div class="row mt-3 pt-3 border-top">
+          <div class="col-12">
+            <div class="small text-muted mb-2">
+              <i class="bi bi-globe"></i> Environmental Data
+            </div>
+            <div class="row">
+              ${environmentalInsights}
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Only add if not already present
+      if (!currentContent.includes('Environmental Data')) {
+        weatherSummary.innerHTML += environmentalSection;
+      }
+    }
   }
 
   async showAPODModal() {
@@ -761,6 +943,42 @@ class StarWXApp {
       'Mission Target': 'bg-info'
     };
     return classMap[visibility] || 'bg-secondary';
+  }
+
+  showSearchLoading(show) {
+    const searchLocationBtn = document.getElementById('searchLocationBtn');
+    const getLocationBtn = document.getElementById('getLocationBtn');
+    const locationInput = document.getElementById('locationInput');
+    
+    if (show) {
+      // Show loading state
+      if (searchLocationBtn) {
+        searchLocationBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Searching...';
+        searchLocationBtn.disabled = true;
+      }
+      if (getLocationBtn) {
+        getLocationBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Searching...';
+        getLocationBtn.disabled = true;
+      }
+      if (locationInput) {
+        locationInput.disabled = true;
+        locationInput.placeholder = 'Searching...';
+      }
+    } else {
+      // Hide loading state
+      if (searchLocationBtn) {
+        searchLocationBtn.innerHTML = '<i class="bi bi-search"></i> Search';
+        searchLocationBtn.disabled = false;
+      }
+      if (getLocationBtn) {
+        getLocationBtn.innerHTML = '<i class="bi bi-geo-alt"></i> My Location';
+        getLocationBtn.disabled = false;
+      }
+      if (locationInput) {
+        locationInput.disabled = false;
+        locationInput.placeholder = 'Enter location...';
+      }
+    }
   }
 
   showMessage(message, type = 'info') {
@@ -1239,43 +1457,153 @@ class StarWXApp {
   }
 
   displayDashboardContent(spaceWeather, enhancedEvents, launches, issPosition) {
+    console.log('Displaying dashboard content with new layout...');
+    
+    // Update ISS Status in the right column
+    const issStatus = document.getElementById('issStatus');
+    if (issStatus && issPosition) {
+      issStatus.innerHTML = this.getCompactISSHtml(issPosition);
+    }
+    
+    // Update Astronomical Events in the right column
+    const astronomicalEvents = document.getElementById('astronomicalEvents');
+    if (astronomicalEvents && enhancedEvents && enhancedEvents.length > 0) {
+      astronomicalEvents.innerHTML = this.getCompactEventsHtml(enhancedEvents);
+    }
+    
+    // Update dashboard content for launches and other full-width content
     const dashboardContent = document.getElementById('dashboardContent');
-    if (!dashboardContent) return;
-    
-    let contentHTML = '';
-    
-    // Add weather status if available
-    if (this.currentLocation) {
-      contentHTML += this.getWeatherStatusHTML();
+    if (dashboardContent) {
+      let contentHTML = '';
+      
+      // Add launches
+      if (launches && launches.length > 0) {
+        contentHTML += this.getLaunchesDashboardHTML(launches);
+      }
+      
+      // If no content, show message
+      if (!contentHTML) {
+        contentHTML = `
+          <div class="text-center py-4">
+            <i class="bi bi-rocket display-4 text-muted"></i>
+            <h4 class="mt-3 text-muted">Space Launches</h4>
+            <p class="text-muted">No planned launches found for your selected date range. Try adjusting the date filter to see upcoming space missions.</p>
+          </div>
+        `;
+      }
+      
+      dashboardContent.innerHTML = contentHTML;
     }
     
-    // Add ISS section
-    if (issPosition) {
-      contentHTML += this.getISSDashboardHTML(issPosition);
-    }
+    console.log('Dashboard content updated with new layout');
+  }
+
+  getCompactISSHtml(issPosition) {
+    const visibility = this.currentLocation ? 
+      this.issService.calculateISSVisibility(issPosition, this.currentLocation) : null;
     
-    // Add astronomical events
-    if (enhancedEvents && enhancedEvents.length > 0) {
-      contentHTML += this.getAstronomicalEventsDashboardHTML(enhancedEvents);
-    }
+    return `
+      <div class="text-center mb-3">
+        <div class="mb-2">
+          <i class="bi bi-satellite text-primary fs-3"></i>
+        </div>
+        <div class="small">
+          <div class="mb-1">
+            <strong>ISS Location</strong>
+          </div>
+          <div class="mb-1">
+            <strong>${issPosition.latitude.toFixed(1)}°N, ${issPosition.longitude.toFixed(1)}°E</strong>
+          </div>
+          <div class="mb-1">
+            <i class="bi bi-arrow-up"></i> ${issPosition.altitude.toFixed(0)} km
+          </div>
+          <div class="mb-2">
+            <span class="badge ${issPosition.visibility === 'nighttime' ? 'bg-dark' : 'bg-warning'} small">
+              ${issPosition.visibility === 'nighttime' ? 'Night' : 'Day'}
+            </span>
+            ${visibility ? `
+              <span class="badge ${visibility.isVisible ? 'bg-success' : 'bg-secondary'} small ms-1">
+                <i class="bi bi-eye"></i> ${visibility.isVisible ? 'Visible' : 'Not Visible'}
+              </span>
+            ` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  getCompactEventsHtml(events) {
+    let eventsHTML = '';
     
-    // Add launches
-    if (launches && launches.length > 0) {
-      contentHTML += this.getLaunchesDashboardHTML(launches);
-    }
+    events.slice(0, 2).forEach(event => {
+      const bestViewingTime = this.getBestViewingTime(event);
+      const eventInfo = this.getEventTypeInfo(event);
+      
+      eventsHTML += `
+        <div class="mb-2 p-2 border rounded">
+          <div class="d-flex justify-content-between align-items-start mb-1">
+            <h6 class="mb-0 small">${event.name || event.type}</h6>
+            <span class="badge ${this.getEventVisibilityClass(event.visibility)} small">
+              ${event.visibility}
+            </span>
+          </div>
+          <div class="small text-muted mb-1">
+            <strong>${eventInfo.type}</strong> - ${event.description.substring(0, 50)}${event.description.length > 50 ? '...' : ''}
+          </div>
+          <div class="small">
+            <i class="bi bi-clock"></i> ${bestViewingTime}
+          </div>
+        </div>
+      `;
+    });
     
-    // If no content, show message
-    if (!contentHTML) {
-      contentHTML = `
-        <div class="text-center py-4">
-          <i class="bi bi-stars display-4 text-muted"></i>
-          <h4 class="mt-3 text-muted">No Events Found</h4>
-          <p class="text-muted">Set your location and date range to see what's visible in your night sky.</p>
+    if (events.length === 0) {
+      eventsHTML = `
+        <div class="text-center py-2">
+          <i class="bi bi-stars text-muted"></i>
+          <p class="text-muted mb-0 small">No events found</p>
         </div>
       `;
     }
     
-    dashboardContent.innerHTML = contentHTML;
+    return eventsHTML;
+  }
+
+  getEventTypeInfo(event) {
+    const eventType = event.type?.toLowerCase() || '';
+    
+    switch (eventType) {
+      case 'close approach':
+        return {
+          type: 'Near-Earth Asteroid',
+          icon: 'bi-asterisk',
+          description: 'Asteroid passing close to Earth'
+        };
+      case 'fireball event':
+        return {
+          type: 'Meteor Fireball',
+          icon: 'bi-fire',
+          description: 'Bright meteor in atmosphere'
+        };
+      case 'risk assessment':
+        return {
+          type: 'Risk Assessment',
+          icon: 'bi-exclamation-triangle',
+          description: 'Asteroid impact risk analysis'
+        };
+      case 'human accessible':
+        return {
+          type: 'Mission Target',
+          icon: 'bi-rocket',
+          description: 'Asteroid accessible for missions'
+        };
+      default:
+        return {
+          type: 'Astronomical Event',
+          icon: 'bi-stars',
+          description: 'Space event or object'
+        };
+    }
   }
 
   getWeatherStatusHTML() {
@@ -1451,6 +1779,8 @@ class StarWXApp {
     return launchesHTML;
   }
 
+
+
   displayDashboardError() {
     const dashboardContent = document.getElementById('dashboardContent');
     if (!dashboardContent) return;
@@ -1537,7 +1867,7 @@ class StarWXApp {
     if (astronomicalDataPanel) {
       astronomicalDataPanel.style.display = 'block';
       
-      // Smooth scroll to the panel
+      // Smooth scroll to the panel when user searches for location
       astronomicalDataPanel.scrollIntoView({ 
         behavior: 'smooth', 
         block: 'start' 
@@ -1620,5 +1950,11 @@ class StarWXApp {
 
 // Initialize the app when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+  // Prevent automatic scrolling to hash fragments
+  if (window.location.hash) {
+    // Clear the hash without scrolling
+    history.replaceState(null, null, window.location.pathname);
+  }
+  
   new StarWXApp();
 }); 

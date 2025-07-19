@@ -605,47 +605,59 @@ class NASAService {
       const events = [];
       
       // Add solar flares
-      flares.forEach(flare => {
-        events.push({
-          id: `flare-${flare.flrID}`,
-          name: `Solar Flare - ${flare.classType || 'Unknown Class'}`,
-          date: flare.beginTime?.split('T')[0] || 'Unknown',
-          description: `Solar flare detected with class ${flare.classType || 'Unknown'}. Activity level: ${flare.activityID || 'Unknown'}`,
-          visibility: this.getFlareVisibility(flare.classType),
-          type: 'Solar Flare',
-          intensity: flare.classType,
-          beginTime: flare.beginTime,
-          endTime: flare.endTime
+      if (Array.isArray(flares)) {
+        flares.forEach(flare => {
+          events.push({
+            id: `flare-${flare.flrID}`,
+            name: `Solar Flare - ${flare.classType || 'Unknown Class'}`,
+            date: flare.beginTime?.split('T')[0] || 'Unknown',
+            description: `Solar flare detected with class ${flare.classType || 'Unknown'}. Activity level: ${flare.activityID || 'Unknown'}`,
+            visibility: this.getFlareVisibility(flare.classType),
+            type: 'Solar Flare',
+            intensity: flare.classType,
+            beginTime: flare.beginTime,
+            endTime: flare.endTime
+          });
         });
-      });
+      } else {
+        console.warn('Solar flare data is not an array:', flares);
+      }
       
       // Add CMEs
-      cmes.forEach(cme => {
-        events.push({
-          id: `cme-${cme.activityID}`,
-          name: `Coronal Mass Ejection`,
-          date: cme.startTime?.split('T')[0] || 'Unknown',
-          description: `CME detected with speed ${cme.speed || 'Unknown'} km/s. Direction: ${cme.type || 'Unknown'}`,
-          visibility: 'High Impact',
-          type: 'Coronal Mass Ejection',
-          speed: cme.speed,
-          direction: cme.type
+      if (Array.isArray(cmes)) {
+        cmes.forEach(cme => {
+          events.push({
+            id: `cme-${cme.activityID}`,
+            name: `Coronal Mass Ejection`,
+            date: cme.startTime?.split('T')[0] || 'Unknown',
+            description: `CME detected with speed ${cme.speed || 'Unknown'} km/s. Direction: ${cme.type || 'Unknown'}`,
+            visibility: 'High Impact',
+            type: 'Coronal Mass Ejection',
+            speed: cme.speed,
+            direction: cme.type
+          });
         });
-      });
+      } else {
+        console.warn('CME data is not an array:', cmes);
+      }
       
       // Add geomagnetic storms
-      storms.forEach(storm => {
-        events.push({
-          id: `storm-${storm.gstID}`,
-          name: `Geomagnetic Storm - ${storm.scale || 'Unknown Scale'}`,
-          date: storm.startTime?.split('T')[0] || 'Unknown',
-          description: `Geomagnetic storm with scale ${storm.scale || 'Unknown'}. Kp index: ${storm.kp || 'Unknown'}`,
-          visibility: this.getStormVisibility(storm.scale),
-          type: 'Geomagnetic Storm',
-          scale: storm.scale,
-          kpIndex: storm.kp
+      if (Array.isArray(storms)) {
+        storms.forEach(storm => {
+          events.push({
+            id: `storm-${storm.gstID}`,
+            name: `Geomagnetic Storm - ${storm.scale || 'Unknown Scale'}`,
+            date: storm.startTime?.split('T')[0] || 'Unknown',
+            description: `Geomagnetic storm with scale ${storm.scale || 'Unknown'}. Kp index: ${storm.kp || 'Unknown'}`,
+            visibility: this.getStormVisibility(storm.scale),
+            type: 'Geomagnetic Storm',
+            scale: storm.scale,
+            kpIndex: storm.kp
+          });
         });
-      });
+      } else {
+        console.warn('Geomagnetic storm data is not an array:', storms);
+      }
       
       // Sort by date and return most recent
       return events
