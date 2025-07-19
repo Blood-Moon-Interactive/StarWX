@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StarWX - Astronomical Events & Weather</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/src/css/main.css">
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <div class="container">
+        <a class="navbar-brand" href="#">
+          <i class="bi bi-stars"></i> StarWX
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto">
+            <li class="nav-item">
+              <a class="nav-link active" href="#home">Home</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#apod">APOD</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#events">Astronomical Events</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#launches">Launches</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#about">About</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+      <!-- Hero Section -->
+      <section id="hero" class="hero-section">
+        <div class="container">
+          <div class="row align-items-center min-vh-100">
+            <div class="col-lg-6">
+              <h1 class="display-4 fw-bold text-white mb-4">
+                Discover the Perfect Night for Stargazing
+              </h1>
+              <p class="lead text-white-50 mb-4">
+                Get real-time weather forecasts and astronomical event information to plan your perfect night under the stars.
+              </p>
+              <div class="location-input">
+                <div class="input-group mb-3">
+                  <input type="text" class="form-control" placeholder="Enter your location..." id="locationInput">
+                  <button class="btn btn-primary" type="button" id="getLocationBtn">
+                    <i class="bi bi-geo-alt"></i> Use My Location
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="weather-card">
+                <div class="card bg-dark text-white">
+                  <div class="card-body text-center">
+                    <h5 class="card-title">Current Conditions</h5>
+                    <div id="weatherDisplay">
+                      <p class="text-muted">Enter your location to see weather and viewing conditions</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Astronomical Events Section -->
+      <section id="events" class="py-5 bg-light">
+        <div class="container">
+          <h2 class="text-center mb-5">Astronomical Events</h2>
+          <div class="row" id="eventsContainer">
+            <!-- Astronomical events will be populated by JavaScript -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Launches Section -->
+      <section id="launches" class="py-5">
+        <div class="container">
+          <h2 class="text-center mb-5">Launches</h2>
+          <div class="row" id="launchesContainer">
+            <!-- Launch events will be populated by JavaScript -->
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white py-4">
+      <div class="container">
+        <div class="row">
+          <div class="col-md-6">
+            <h5>StarWX</h5>
+            <p class="text-muted">Your guide to the perfect night under the stars.</p>
+          </div>
+          <div class="col-md-6 text-md-end">
+            <p class="text-muted">&copy; 2025 StarWX. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <!-- Custom JavaScript -->
+    <script type="module" src="/src/js/main.js"></script>
+  </body>
+</html> 
