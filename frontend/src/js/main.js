@@ -49,6 +49,9 @@ class StarWXApp {
         this.showAPODModal();
       });
     }
+    
+    // Date filter event listeners
+    this.setupDateFilterListeners();
   }
 
   async getUserLocation() {
@@ -274,30 +277,45 @@ class StarWXApp {
     });
   }
 
-  async loadAstronomicalEvents() {
+  async loadAstronomicalEvents(startDate = null, endDate = null) {
     try {
-      console.log('Loading astronomical events...');
+      console.log('Loading enhanced astronomical events...', { startDate, endDate });
       
-      // Get various types of astronomical events (excluding APOD)
-      const [spaceWeather, astronomicalEvents] = await Promise.all([
+      // Get enhanced astronomical events from JPL API with optional date filtering
+      const [spaceWeather, enhancedEvents] = await Promise.all([
         this.nasaService.getSpaceWeatherEvents(),
-        this.nasaService.getAstronomicalEvents()
+        this.nasaService.getEnhancedAstronomicalEvents(startDate, endDate)
       ]);
       
-      this.displayAstronomicalEvents(spaceWeather, astronomicalEvents);
+      this.displayAstronomicalEvents(spaceWeather, enhancedEvents, startDate, endDate);
       
     } catch (error) {
-      console.error('Error loading astronomical events:', error);
+      console.error('Error loading enhanced astronomical events:', error);
       this.displayAstronomicalEventsError();
     }
   }
 
-  displayAstronomicalEvents(spaceWeather, astronomicalEvents) {
+  displayAstronomicalEvents(spaceWeather, enhancedEvents, startDate = null, endDate = null) {
     const eventsContainer = document.getElementById('eventsContainer');
     if (!eventsContainer) return;
     
     let eventsHTML = '';
     let hasEvents = false;
+    
+    // Add date range header if filtering
+    if (startDate && endDate) {
+      const start = new Date(startDate).toLocaleDateString();
+      const end = new Date(endDate).toLocaleDateString();
+      eventsHTML += `
+        <div class="col-12 mb-4">
+          <div class="alert alert-info">
+            <i class="bi bi-calendar-check"></i> 
+            Showing events from <strong>${start}</strong> to <strong>${end}</strong>
+            <button type="button" class="btn-close float-end" id="clearDateFilter"></button>
+          </div>
+        </div>
+      `;
+    }
     
     // Add space weather events
     if (spaceWeather && spaceWeather.length > 0) {
@@ -320,20 +338,65 @@ class StarWXApp {
       });
     }
     
-    // Add astronomical events
-    if (astronomicalEvents && astronomicalEvents.length > 0) {
+    // Add enhanced astronomical events (JPL data)
+    if (enhancedEvents && enhancedEvents.length > 0) {
       hasEvents = true;
-      astronomicalEvents.slice(0, 3).forEach(event => {
+      enhancedEvents.forEach(event => {
+        // Create additional details based on event type
+        let additionalInfo = '';
+        if (event.type === 'Fireball Event') {
+          additionalInfo = `
+            <div class="mt-2">
+              <small class="text-muted">
+                <i class="bi bi-lightning"></i> Energy: ${event.energy} kt<br>
+                <i class="bi bi-geo-alt"></i> Location: ${event.latitude} ${event.longitude}<br>
+                <i class="bi bi-arrow-up"></i> Altitude: ${event.altitude} km
+              </small>
+            </div>
+          `;
+        } else if (event.type === 'Close Approach') {
+          additionalInfo = `
+            <div class="mt-2">
+              <small class="text-muted">
+                <i class="bi bi-arrow-right"></i> Distance: ${event.distanceKm?.toFixed(0)} km<br>
+                <i class="bi bi-speedometer2"></i> Velocity: ${event.relativeVelocity?.toFixed(1)} km/s<br>
+                <i class="bi bi-eye"></i> Magnitude: ${event.hMagnitude?.toFixed(1)}
+              </small>
+            </div>
+          `;
+        } else if (event.type === 'Risk Assessment') {
+          additionalInfo = `
+            <div class="mt-2">
+              <small class="text-muted">
+                <i class="bi bi-exclamation-triangle"></i> Impact Probability: ${(event.impactProbability * 100).toFixed(6)}%<br>
+                <i class="bi bi-rulers"></i> Diameter: ${event.diameter?.toFixed(1)} m<br>
+                <i class="bi bi-calendar"></i> Last Obs: ${event.lastObservation}
+              </small>
+            </div>
+          `;
+        } else if (event.type === 'Human Accessible') {
+          additionalInfo = `
+            <div class="mt-2">
+              <small class="text-muted">
+                <i class="bi bi-rocket"></i> ΔV: ${event.minDeltaV?.toFixed(1)} km/s<br>
+                <i class="bi bi-clock"></i> Duration: ${event.duration} days<br>
+                <i class="bi bi-rulers"></i> Size: ${event.minSize?.toFixed(0)}-${event.maxSize?.toFixed(0)} m
+              </small>
+            </div>
+          `;
+        }
+        
         eventsHTML += `
           <div class="col-lg-4 col-md-6 mb-4">
             <div class="card h-100">
               <div class="card-body">
-                <h6 class="card-title">${event.name}</h6>
+                <h6 class="card-title">${event.name || event.type}</h6>
                 <p class="card-text">${event.description}</p>
                 <span class="badge ${this.getEventVisibilityClass(event.visibility)}">
                   ${event.visibility}
                 </span>
                 <small class="text-muted d-block mt-2">${event.date}</small>
+                ${additionalInfo}
               </div>
             </div>
           </div>
@@ -343,18 +406,26 @@ class StarWXApp {
     
     // If no events found, show a message
     if (!hasEvents) {
-      eventsHTML = `
+      eventsHTML += `
         <div class="col-12">
           <div class="text-center py-5">
             <i class="bi bi-stars display-1 text-muted"></i>
             <h4 class="mt-3 text-muted">No Astronomical Events Found</h4>
-            <p class="text-muted">Check back later for upcoming celestial events.</p>
+            <p class="text-muted">${startDate && endDate ? 'No events found in the selected date range.' : 'Check back later for upcoming celestial events.'}</p>
           </div>
         </div>
       `;
     }
     
     eventsContainer.innerHTML = eventsHTML;
+    
+    // Add event listener for clear filter button
+    const clearFilterBtn = document.getElementById('clearDateFilter');
+    if (clearFilterBtn) {
+      clearFilterBtn.addEventListener('click', () => {
+        this.clearDateFilter();
+      });
+    }
   }
 
   displayAstronomicalEventsError() {
@@ -446,7 +517,12 @@ class StarWXApp {
       'Low': 'bg-success',
       'Very Low': 'bg-secondary',
       'Hazardous': 'bg-danger',
-      'Close Approach': 'bg-warning'
+      'Close Approach': 'bg-warning',
+      'Atmospheric Impact': 'bg-danger',
+      'Very Close': 'bg-danger',
+      'High Risk': 'bg-danger',
+      'Low Risk': 'bg-warning',
+      'Mission Target': 'bg-info'
     };
     return classMap[visibility] || 'bg-secondary';
   }
@@ -469,6 +545,107 @@ class StarWXApp {
         toast.parentNode.removeChild(toast);
       }
     }, 5000);
+  }
+
+  // Date filter functionality
+  setupDateFilterListeners() {
+    const dateRangeSelect = document.getElementById('dateRangeSelect');
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    const applyFilterBtn = document.getElementById('applyDateFilter');
+    
+    if (dateRangeSelect) {
+      dateRangeSelect.addEventListener('change', () => {
+        this.updateDateInputs(dateRangeSelect.value);
+      });
+    }
+    
+    if (applyFilterBtn) {
+      applyFilterBtn.addEventListener('click', () => {
+        this.applyDateFilter();
+      });
+    }
+    
+    // Initialize with upcoming events
+    this.updateDateInputs('upcoming');
+  }
+
+  updateDateInputs(rangeType) {
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    
+    if (!startDateInput || !endDateInput) return;
+    
+    const today = new Date();
+    let startDate, endDate;
+    
+    switch (rangeType) {
+      case 'upcoming':
+        startDate = today;
+        endDate = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+        break;
+      case 'past':
+        startDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+        endDate = today;
+        break;
+      case 'week':
+        startDate = today;
+        endDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+        break;
+      case 'month':
+        startDate = today;
+        endDate = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate()); // Next month
+        break;
+      case 'quarter':
+        startDate = today;
+        endDate = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000); // 90 days from now
+        break;
+      case 'custom':
+        // Don't change the inputs for custom
+        return;
+      default:
+        startDate = today;
+        endDate = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+    }
+    
+    startDateInput.value = startDate.toISOString().split('T')[0];
+    endDateInput.value = endDate.toISOString().split('T')[0];
+  }
+
+  async applyDateFilter() {
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    
+    if (!startDateInput || !endDateInput) return;
+    
+    const startDate = startDateInput.value;
+    const endDate = endDateInput.value;
+    
+    if (!startDate || !endDate) {
+      this.showMessage('Please select both start and end dates', 'warning');
+      return;
+    }
+    
+    if (new Date(startDate) > new Date(endDate)) {
+      this.showMessage('Start date must be before end date', 'warning');
+      return;
+    }
+    
+    // Load events with date filter
+    await this.loadAstronomicalEvents(startDate, endDate);
+  }
+
+  clearDateFilter() {
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    const dateRangeSelect = document.getElementById('dateRangeSelect');
+    
+    if (startDateInput) startDateInput.value = '';
+    if (endDateInput) endDateInput.value = '';
+    if (dateRangeSelect) dateRangeSelect.value = 'upcoming';
+    
+    // Reset to default view
+    this.loadAstronomicalEvents();
   }
 }
 

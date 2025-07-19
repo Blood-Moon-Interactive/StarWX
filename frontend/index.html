@@ -86,6 +86,55 @@
       <section id="events" class="py-5 bg-light">
         <div class="container">
           <h2 class="text-center mb-5">Astronomical Events</h2>
+          
+          <!-- Date Range Selector -->
+          <div class="row mb-4">
+            <div class="col-lg-8 mx-auto">
+              <div class="card">
+                <div class="card-body">
+                  <h6 class="card-title mb-3">
+                    <i class="bi bi-calendar-range"></i> Filter Events by Date Range
+                  </h6>
+                  <div class="row">
+                    <div class="col-md-3">
+                      <label for="dateRangeSelect" class="form-label">Quick Select</label>
+                      <select class="form-select" id="dateRangeSelect">
+                        <option value="upcoming">Upcoming Events (Next 30 days)</option>
+                        <option value="past">Recent Past (Last 30 days)</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                        <option value="quarter">Next Quarter</option>
+                        <option value="custom">Custom Range</option>
+                      </select>
+                    </div>
+                    <div class="col-md-3">
+                      <label for="startDate" class="form-label">Start Date</label>
+                      <input type="date" class="form-control" id="startDate">
+                    </div>
+                    <div class="col-md-3">
+                      <label for="endDate" class="form-label">End Date</label>
+                      <input type="date" class="form-control" id="endDate">
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label">&nbsp;</label>
+                      <button class="btn btn-primary w-100" id="applyDateFilter">
+                        <i class="bi bi-search"></i> Apply Filter
+                      </button>
+                    </div>
+                  </div>
+                  <div class="row mt-2">
+                    <div class="col-12">
+                      <small class="text-muted">
+                        <i class="bi bi-info-circle"></i> 
+                        Select a date range to filter astronomical events. Events include close approaches, fireballs, risk assessments, and mission targets.
+                      </small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <div class="row" id="eventsContainer">
             <!-- Astronomical events will be populated by JavaScript -->
           </div>

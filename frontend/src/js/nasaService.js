@@ -2,6 +2,7 @@ class NASAService {
   constructor() {
     this.apiKey = '5aUu02Y7qeM13AUdpsdQF8l8iXwYlaOCprDWMiW5';
     this.baseUrl = 'https://api.nasa.gov';
+    this.jplBaseUrl = 'https://ssd-api.jpl.nasa.gov';
   }
 
   // Get Astronomy Picture of the Day
@@ -62,6 +63,224 @@ class NASAService {
     }
   }
 
+  // Get JPL Fireball Events (atmospheric impact events) - filtered for recent/upcoming
+  async getFireballEvents(limit = 10) {
+    try {
+      const response = await fetch(`${this.jplBaseUrl}/fireball.api?limit=${limit}`);
+      const data = await response.json();
+      
+      console.log('JPL Fireball data:', data);
+      
+      if (data.data && data.data.length > 0) {
+        const now = new Date();
+        const events = data.data
+          .map(event => ({
+            id: `fireball-${event[0].replace(/[^a-zA-Z0-9]/g, '')}`,
+            date: event[0],
+            eventDate: new Date(event[0]),
+            energy: parseFloat(event[1]),
+            impactEnergy: parseFloat(event[2]),
+            latitude: `${event[3]}°${event[4]}`,
+            longitude: `${event[5]}°${event[6]}`,
+            altitude: parseFloat(event[7]),
+            velocity: event[8] ? parseFloat(event[8]) : null,
+            description: `Fireball event with ${event[1]} kt energy detected at ${event[3]}°${event[4]} ${event[5]}°${event[6]}`,
+            type: 'Fireball Event',
+            visibility: 'Atmospheric Impact'
+          }))
+          .filter(event => {
+            // Show recent events (within last 30 days) and upcoming events
+            const daysDiff = (now - event.eventDate) / (1000 * 60 * 60 * 24);
+            return daysDiff >= -30 && daysDiff <= 30; // Within 30 days past or future
+          })
+          .sort((a, b) => a.eventDate - b.eventDate); // Sort by date
+        
+        return events.slice(0, limit);
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Error fetching JPL Fireball data:', error);
+      return [];
+    }
+  }
+
+  // Get JPL Close Approach Events (enhanced NEO data) - filtered for upcoming
+  async getCloseApproachEvents(limit = 10) {
+    try {
+      const response = await fetch(`${this.jplBaseUrl}/cad.api?limit=${limit * 2}`); // Get more to filter
+      const data = await response.json();
+      
+      console.log('JPL Close Approach data:', data);
+      
+      if (data.data && data.data.length > 0) {
+        const now = new Date();
+        const events = data.data
+          .map(event => ({
+            id: `close-approach-${event[0].replace(/[^a-zA-Z0-9]/g, '')}`,
+            name: event[0],
+            date: event[3],
+            eventDate: new Date(event[3]),
+            distance: parseFloat(event[4]),
+            distanceMin: parseFloat(event[5]),
+            distanceMax: parseFloat(event[6]),
+            relativeVelocity: parseFloat(event[7]),
+            infiniteVelocity: parseFloat(event[8]),
+            hMagnitude: parseFloat(event[10]),
+            description: `${event[0]} will pass within ${(parseFloat(event[4]) * 149597870.7).toFixed(0)} km of Earth`,
+            type: 'Close Approach',
+            visibility: parseFloat(event[4]) < 0.05 ? 'Very Close' : 'Close Approach',
+            distanceKm: parseFloat(event[4]) * 149597870.7 // Convert AU to km
+          }))
+          .filter(event => {
+            // Show upcoming events (within next 90 days) and very recent past events
+            const daysDiff = (event.eventDate - now) / (1000 * 60 * 60 * 24);
+            return daysDiff >= -7 && daysDiff <= 90; // Within 7 days past or 90 days future
+          })
+          .sort((a, b) => a.eventDate - b.eventDate); // Sort by date
+        
+        return events.slice(0, limit);
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Error fetching JPL Close Approach data:', error);
+      return [];
+    }
+  }
+
+  // Get JPL Sentry Risk Assessment Data - filtered for high-risk upcoming
+  async getRiskAssessmentData(limit = 10) {
+    try {
+      const response = await fetch(`${this.jplBaseUrl}/sentry.api?limit=${limit * 2}`); // Get more to filter
+      const data = await response.json();
+      
+      console.log('JPL Sentry data:', data);
+      
+      if (data.data && data.data.length > 0) {
+        const events = data.data
+          .map(event => ({
+            id: `risk-${event.des.replace(/[^a-zA-Z0-9]/g, '')}`,
+            name: event.fullname,
+            designation: event.des,
+            impactProbability: parseFloat(event.ps_cum),
+            maxImpactProbability: parseFloat(event.ps_max),
+            diameter: parseFloat(event.diameter),
+            velocity: parseFloat(event.v_inf),
+            lastObservation: event.last_obs,
+            impactRange: event.range,
+            numberOfImpacts: parseInt(event.n_imp),
+            hMagnitude: parseFloat(event.h),
+            description: `${event.fullname} has a ${(parseFloat(event.ps_cum) * 100).toFixed(6)}% chance of Earth impact`,
+            type: 'Risk Assessment',
+            visibility: parseFloat(event.ps_cum) > 0.001 ? 'High Risk' : 'Low Risk'
+          }))
+          .filter(event => {
+            // Show only high-risk events or events with recent observations
+            return event.impactProbability > 0.0001 || event.visibility === 'High Risk';
+          })
+          .sort((a, b) => b.impactProbability - a.impactProbability); // Sort by risk (highest first)
+        
+        return events.slice(0, limit);
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Error fetching JPL Sentry data:', error);
+      return [];
+    }
+  }
+
+  // Get JPL NHATS Data (human-accessible NEOs) - filtered for upcoming opportunities
+  async getNHATSData(limit = 10) {
+    try {
+      const response = await fetch(`${this.jplBaseUrl}/nhats.api?limit=${limit * 2}`); // Get more to filter
+      const data = await response.json();
+      
+      console.log('JPL NHATS data:', data);
+      
+      if (data.data && data.data.length > 0) {
+        const events = data.data
+          .map(event => ({
+            id: `nhats-${event.des.replace(/[^a-zA-Z0-9]/g, '')}`,
+            name: event.des,
+            hMagnitude: parseFloat(event.h),
+            minDeltaV: parseFloat(event.min_dv?.dv),
+            duration: parseInt(event.min_dv?.dur),
+            maxSize: parseFloat(event.max_size),
+            minSize: parseFloat(event.min_size),
+            observationStart: event.obs_start,
+            numberOfTrajectories: parseInt(event.n_via_traj),
+            description: `${event.des} is accessible with ΔV of ${event.min_dv?.dv} km/s`,
+            type: 'Human Accessible',
+            visibility: 'Mission Target'
+          }))
+          .filter(event => {
+            // Show only accessible targets with reasonable mission parameters
+            return event.minDeltaV < 15 && event.duration < 1000; // Reasonable mission parameters
+          })
+          .sort((a, b) => a.minDeltaV - b.minDeltaV); // Sort by accessibility (lowest ΔV first)
+        
+        return events.slice(0, limit);
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Error fetching JPL NHATS data:', error);
+      return [];
+    }
+  }
+
+  // Get enhanced astronomical events combining NASA and JPL data - with date range filtering
+  async getEnhancedAstronomicalEvents(startDate = null, endDate = null) {
+    try {
+      // Get data from multiple sources
+      const [fireballEvents, closeApproachEvents, riskEvents, nhatsEvents] = await Promise.all([
+        this.getFireballEvents(10), // Get more to filter
+        this.getCloseApproachEvents(15), // Get more to filter
+        this.getRiskAssessmentData(5), // Get more to filter
+        this.getNHATSData(5) // Get more to filter
+      ]);
+      
+      // Combine all events
+      let allEvents = [
+        ...closeApproachEvents.map(event => ({ ...event, priority: 1 })),
+        ...fireballEvents.map(event => ({ ...event, priority: 2 })),
+        ...riskEvents.map(event => ({ ...event, priority: 3 })),
+        ...nhatsEvents.map(event => ({ ...event, priority: 4 }))
+      ];
+      
+      // Filter by date range if provided
+      if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        
+        allEvents = allEvents.filter(event => {
+          if (!event.eventDate) return false;
+          return event.eventDate >= start && event.eventDate <= end;
+        });
+      }
+      
+      // Sort by priority and date, return top events
+      return allEvents
+        .sort((a, b) => {
+          if (a.priority !== b.priority) {
+            return a.priority - b.priority;
+          }
+          // If same priority, sort by date (upcoming first)
+          if (a.eventDate && b.eventDate) {
+            return a.eventDate - b.eventDate;
+          }
+          return 0;
+        })
+        .slice(0, 12); // Show up to 12 events when filtered
+        
+    } catch (error) {
+      console.error('Error fetching enhanced astronomical events:', error);
+      return [];
+    }
+  }
+
   // Get Mars Rover Photos (for space exploration content)
   async getMarsRoverPhotos(sol = 1000, camera = 'all') {
     try {
@@ -107,7 +326,7 @@ class NASAService {
     }
   }
 
-  // Get real astronomical events (comets, meteor showers, etc.)
+  // Get real astronomical events (comets, meteor showers, etc.) - Legacy method
   async getAstronomicalEvents() {
     try {
       // Get current date and next 30 days
