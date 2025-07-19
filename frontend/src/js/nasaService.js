@@ -66,7 +66,7 @@ class NASAService {
   // Get JPL Fireball Events (atmospheric impact events) - filtered for recent/upcoming
   async getFireballEvents(limit = 10) {
     try {
-      const response = await fetch(`${this.jplBaseUrl}/fireball.api?limit=${limit}`);
+      const response = await fetch(`${this.jplBaseUrl}/fireball.api`);
       const data = await response.json();
       
       console.log('JPL Fireball data:', data);
@@ -108,7 +108,7 @@ class NASAService {
   // Get JPL Close Approach Events (enhanced NEO data) - filtered for upcoming
   async getCloseApproachEvents(limit = 10) {
     try {
-      const response = await fetch(`${this.jplBaseUrl}/cad.api?limit=${limit * 2}`); // Get more to filter
+      const response = await fetch(`${this.jplBaseUrl}/cad.api`);
       const data = await response.json();
       
       console.log('JPL Close Approach data:', data);
@@ -152,7 +152,7 @@ class NASAService {
   // Get JPL Sentry Risk Assessment Data - filtered for high-risk upcoming
   async getRiskAssessmentData(limit = 10) {
     try {
-      const response = await fetch(`${this.jplBaseUrl}/sentry.api?limit=${limit * 2}`); // Get more to filter
+      const response = await fetch(`${this.jplBaseUrl}/sentry.api`);
       const data = await response.json();
       
       console.log('JPL Sentry data:', data);
@@ -194,7 +194,7 @@ class NASAService {
   // Get JPL NHATS Data (human-accessible NEOs) - filtered for upcoming opportunities
   async getNHATSData(limit = 10) {
     try {
-      const response = await fetch(`${this.jplBaseUrl}/nhats.api?limit=${limit * 2}`); // Get more to filter
+      const response = await fetch(`${this.jplBaseUrl}/nhats.api`);
       const data = await response.json();
       
       console.log('JPL NHATS data:', data);
@@ -231,8 +231,8 @@ class NASAService {
     }
   }
 
-  // Get enhanced astronomical events combining NASA and JPL data - with date range filtering
-  async getEnhancedAstronomicalEvents(startDate = null, endDate = null) {
+  // Get enhanced astronomical events combining NASA and JPL data - with date range and location filtering
+  async getEnhancedAstronomicalEvents(startDate = null, endDate = null, userLocation = null) {
     try {
       // Get data from multiple sources
       const [fireballEvents, closeApproachEvents, riskEvents, nhatsEvents] = await Promise.all([
@@ -261,6 +261,11 @@ class NASAService {
         });
       }
       
+      // Filter by location if provided
+      if (userLocation && userLocation.lat && userLocation.lon) {
+        allEvents = this.filterEventsByLocation(allEvents, userLocation);
+      }
+      
       // Sort by priority and date, return top events
       return allEvents
         .sort((a, b) => {
@@ -279,6 +284,150 @@ class NASAService {
       console.error('Error fetching enhanced astronomical events:', error);
       return [];
     }
+  }
+
+  // Filter events based on user location and visibility
+  filterEventsByLocation(events, userLocation) {
+    return events.map(event => {
+      const visibility = this.calculateEventVisibility(event, userLocation);
+      return {
+        ...event,
+        visibilityFromLocation: visibility,
+        isVisibleFromLocation: visibility.isVisible
+      };
+    }).filter(event => {
+      // Keep events that are visible from the user's location
+      return event.isVisibleFromLocation;
+    });
+  }
+
+  // Calculate if an event is visible from a specific location
+  calculateEventVisibility(event, userLocation) {
+    const { lat: userLat, lon: userLon } = userLocation;
+    
+    // Different visibility calculations based on event type
+    switch (event.type) {
+      case 'Fireball Event':
+        return this.calculateFireballVisibility(event, userLat, userLon);
+      case 'Close Approach':
+        return this.calculateCloseApproachVisibility(event, userLat, userLon);
+      case 'Risk Assessment':
+        return this.calculateRiskVisibility(event, userLat, userLon);
+      case 'Human Accessible':
+        return this.calculateNHATSVisibility(event, userLat, userLon);
+      default:
+        return { isVisible: true, reason: 'Unknown event type' };
+    }
+  }
+
+  // Calculate fireball visibility (atmospheric events)
+  calculateFireballVisibility(event, userLat, userLon) {
+    if (!event.latitude || !event.longitude) {
+      return { isVisible: false, reason: 'No location data' };
+    }
+    
+    // Parse fireball coordinates (format: "45.2°N 122.1°W")
+    const latMatch = event.latitude.match(/(\d+\.?\d*)°([NS])/);
+    const lonMatch = event.longitude.match(/(\d+\.?\d*)°([EW])/);
+    
+    if (!latMatch || !lonMatch) {
+      return { isVisible: false, reason: 'Invalid coordinates' };
+    }
+    
+    const fireballLat = parseFloat(latMatch[1]) * (latMatch[2] === 'N' ? 1 : -1);
+    const fireballLon = parseFloat(lonMatch[1]) * (lonMatch[2] === 'E' ? 1 : -1);
+    
+    // Calculate distance from user to fireball
+    const distance = this.calculateDistance(userLat, userLon, fireballLat, fireballLon);
+    
+    // Fireballs are visible within ~1000 km radius
+    const isVisible = distance <= 1000;
+    
+    return {
+      isVisible,
+      reason: isVisible ? `Visible within ${distance.toFixed(0)} km` : 'Too far away',
+      distance: distance,
+      direction: this.getDirection(userLat, userLon, fireballLat, fireballLon)
+    };
+  }
+
+  // Calculate close approach visibility (NEO events)
+  calculateCloseApproachVisibility(event, userLat, userLon) {
+    // Close approaches are generally visible worldwide if conditions are right
+    // But we can prioritize based on distance and magnitude
+    const isVisible = true; // Most close approaches are visible globally
+    
+    let reason = 'Visible worldwide';
+    let priority = 'normal';
+    
+    // Prioritize very close approaches
+    if (event.distanceKm && event.distanceKm < 1000000) { // Within 1 million km
+      priority = 'high';
+      reason = 'Very close approach - excellent visibility';
+    } else if (event.hMagnitude && event.hMagnitude < 20) { // Bright object
+      priority = 'medium';
+      reason = 'Bright object - good visibility';
+    }
+    
+    return {
+      isVisible,
+      reason,
+      priority,
+      distance: event.distanceKm,
+      magnitude: event.hMagnitude
+    };
+  }
+
+  // Calculate risk assessment visibility
+  calculateRiskVisibility(event, userLat, userLon) {
+    // Risk assessments are informational and visible worldwide
+    return {
+      isVisible: true,
+      reason: 'Global monitoring - informational',
+      riskLevel: event.impactProbability > 0.001 ? 'high' : 'low'
+    };
+  }
+
+  // Calculate NHATS visibility (mission targets)
+  calculateNHATSVisibility(event, userLat, userLon) {
+    // NHATS targets are accessible from Earth, so visible worldwide
+    return {
+      isVisible: true,
+      reason: 'Mission target - accessible from Earth',
+      accessibility: event.minDeltaV < 10 ? 'excellent' : 'good'
+    };
+  }
+
+  // Calculate distance between two points on Earth
+  calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Earth's radius in km
+    const dLat = this.toRadians(lat2 - lat1);
+    const dLon = this.toRadians(lon2 - lon1);
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  // Convert degrees to radians
+  toRadians(degrees) {
+    return degrees * (Math.PI/180);
+  }
+
+  // Get direction from user to event
+  getDirection(userLat, userLon, eventLat, eventLon) {
+    const dLon = this.toRadians(eventLon - userLon);
+    const lat1 = this.toRadians(userLat);
+    const lat2 = this.toRadians(eventLat);
+    
+    const y = Math.sin(dLon) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+    const bearing = Math.atan2(y, x);
+    
+    const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    const index = Math.round(bearing * 4 / Math.PI + 4) % 8;
+    return directions[index];
   }
 
   // Get Mars Rover Photos (for space exploration content)

@@ -28,6 +28,9 @@ StarWX/
 ├── frontend/              # Vanilla JS + Bootstrap frontend
 │   ├── src/
 │   │   ├── js/           # JavaScript modules
+│   │   │   ├── main.js   # Main application logic
+│   │   │   ├── nasaService.js # NASA API integration
+│   │   │   └── weatherService.js # Multi-API weather service
 │   │   ├── css/          # Custom styles
 │   │   └── pages/        # HTML pages
 │   ├── public/           # Static assets
@@ -50,26 +53,31 @@ StarWX/
 - [x] **User Interface**
   - [x] Responsive homepage with Bootstrap
   - [x] Location input and geolocation
-  - [x] Weather display component
-  - [x] Astronomical events list
+  - [x] Unified dashboard with weather and astronomical data
+  - [x] Astronomical events list with best viewing times
   - [x] APOD modal (on-demand loading)
+  - [x] Date range filtering with custom and predefined ranges
+  - [x] Loading states and user feedback
 
 - [x] **Weather Integration**
-  - [x] Current weather conditions
+  - [x] Current weather conditions with dual temperature display (°F/°C)
   - [x] Multi-API support (NWS for US, WeatherAPI.com for international)
-  - [x] Sky visibility indicators
-  - [x] Cloud cover analysis and viewing conditions
+  - [x] Sky visibility indicators and viewing conditions
+  - [x] Cloud cover analysis and weather condition badges
+  - [x] Temperature validation and fallback data
 
 - [x] **Astronomical Data**
   - [x] NASA Astronomy Picture of the Day (APOD)
-  - [x] Space weather events (solar flares, CMEs, geomagnetic storms)
+  - [x] NASA JPL APIs for astronomical events
   - [x] Near Earth Objects (asteroids, comets)
   - [x] Real-time astronomical event tracking
+  - [x] Best viewing times and weather conditions for events
 
 - [x] **Development Tools**
-  - [x] Easy start/stop scripts
+  - [x] Easy start/stop scripts (start-dev.bat, start-dev.ps1)
   - [x] Hot reload development server
   - [x] Error handling and user feedback
+  - [x] Console debugging and logging
 
 ### Phase 2: User Features
 - [ ] **User Authentication**
@@ -108,10 +116,11 @@ StarWX/
 - **Weather APIs**: 
   - ✅ NWS (National Weather Service) for US locations
   - ✅ WeatherAPI.com for international locations
+  - ✅ Dual temperature display (°F/°C) for all locations
   - ✅ Fallback mock data for reliability
 - **Astronomical APIs**: 
   - ✅ NASA APOD (Astronomy Picture of the Day)
-  - ✅ NASA Space Weather (DONKI) - solar flares, CMEs, geomagnetic storms
+  - ✅ NASA JPL APIs for astronomical events
   - ✅ NASA NEO (Near Earth Objects) - asteroids and comets
   - ✅ NASA EPIC (Earth Polychromatic Imaging Camera)
 - **Geocoding**: Manual location input with coordinate support
@@ -124,12 +133,19 @@ StarWX/
 - [x] Project structure setup
 - [x] Frontend development environment with Vite + Bootstrap
 - [x] Basic HTML pages and responsive design
-- [x] NASA API integration (APOD, space weather, astronomical events)
+- [x] NASA API integration (APOD, JPL APIs, astronomical events)
 - [x] Weather API integration (NWS for US, WeatherAPI.com for international)
-- [x] Location-based weather display
+- [x] Location-based weather display with dual temperature units
 - [x] Astronomical events display with proper error handling
 - [x] APOD modal implementation (on-demand loading)
 - [x] Development scripts for easy start/stop
+- [x] Unified dashboard design with weather and astronomical data
+- [x] Date range filtering with custom and predefined ranges
+- [x] Best viewing times and weather conditions for astronomical events
+- [x] Loading states and user feedback improvements
+- [x] NASA JPL API error fixes (removed unsupported query parameters)
+- [x] Temperature unit conversion and validation
+- [x] Responsive UI improvements and redundant element removal
 
 ### In Progress 🔄
 - [ ] Backend API development
@@ -180,10 +196,31 @@ StarWX/
   - Added proper error handling and user feedback
   - Optimized APOD to load only when requested
 
-- **Next Session Goals**:
-  - Set up backend with Express
-  - Implement database models
-  - Add user authentication system
+### Session 3 (UI/UX Improvements & API Fixes)
+- **Date**: 7/19/2025 (Continued)
+- **Major Improvements**:
+  - **Unified Dashboard**: Combined weather and astronomical data in single panel
+  - **Dual Temperature Display**: Shows both °F and °C for all locations
+  - **Date Range Filtering**: Added custom and predefined date ranges with "Apply" button
+  - **NASA API Fixes**: Resolved 400 Bad Request errors by removing unsupported query parameters
+  - **Weather Service Enhancement**: Improved temperature parsing and validation
+  - **UI Streamlining**: Removed redundant weather card from hero section
+  - **Loading States**: Added spinner during data fetch operations
+  - **Best Viewing Times**: Added viewing time and weather condition badges for astronomical events
+
+- **Technical Fixes**:
+  - Fixed NASA JPL API calls by removing `limit` parameters causing 400 errors
+  - Implemented proper temperature unit conversion (Celsius to Fahrenheit)
+  - Added temperature validation with fallback data
+  - Enhanced error handling and debugging for weather APIs
+  - Improved date range filtering with automatic updates for predefined ranges
+
+- **User Experience Improvements**:
+  - Centered location input in hero section
+  - Unified data panel appears when location is provided
+  - Custom date range with "Apply" button for manual execution
+  - Automatic updates for predefined date ranges (Today, This Week, This Month)
+  - Better visual hierarchy and reduced UI clutter
 
 ## Development Guidelines
 
@@ -222,5 +259,5 @@ StarWX/
 ---
 
 **Last Updated**: 7/19/2025
-**Project Status**: Frontend MVP Complete
+**Project Status**: Frontend MVP Complete with Enhanced UI/UX
 **Next Milestone**: Backend Development 

@@ -36,8 +36,37 @@ class WeatherService {
       // Extract current conditions and format for display
       const current = weatherData.current;
       
+      // Debug logging
+      console.log('Weather data for display:', {
+        temperature: current.temperature,
+        description: current.condition,
+        humidity: current.humidity,
+        windSpeed: current.windSpeed,
+        visibility: current.visibility,
+        cloudCover: current.cloudCover
+      });
+      
+      // Get temperature in Celsius (base unit)
+      let temperatureCelsius = current.temperature?.value || 0;
+      let temperatureUnit = current.temperature?.unit || '°C';
+      
+      // Convert to Celsius if needed
+      if (temperatureUnit === '°F') {
+        temperatureCelsius = (temperatureCelsius - 32) * 5/9;
+      }
+      
+      // Calculate Fahrenheit
+      const temperatureFahrenheit = (temperatureCelsius * 9/5) + 32;
+      
+      // Ensure temperatures are reasonable
+      if (temperatureCelsius < -50 || temperatureCelsius > 60) {
+        console.warn('Unreasonable temperature detected:', temperatureCelsius, '°C, using fallback');
+        temperatureCelsius = 20;
+      }
+      
       return {
-        temperature: current.temperature?.value || 0,
+        temperatureCelsius: Math.round(temperatureCelsius * 10) / 10,
+        temperatureFahrenheit: Math.round(temperatureFahrenheit * 10) / 10,
         description: current.condition || 'Unknown',
         humidity: current.humidity || 0,
         windSpeed: current.windSpeed || 0,
@@ -48,7 +77,8 @@ class WeatherService {
       console.error('Error getting current weather:', error);
       // Return fallback data
       return {
-        temperature: 20,
+        temperatureCelsius: 20,
+        temperatureFahrenheit: 68,
         description: 'Partly Cloudy',
         humidity: 60,
         windSpeed: 10,
@@ -147,18 +177,36 @@ class WeatherService {
 
   // Parse WeatherAPI.com current conditions
   parseWeatherApiCurrent(currentData, location) {
+    // Debug logging to see what we're getting
+    console.log('WeatherAPI current data:', currentData);
+    
+    // Ensure temperature is properly parsed
+    let temperature = 0;
+    if (currentData.temp_c !== null && currentData.temp_c !== undefined) {
+      temperature = parseFloat(currentData.temp_c);
+    } else if (currentData.temp_f !== null && currentData.temp_f !== undefined) {
+      // If only Fahrenheit is available, convert to Celsius
+      temperature = (parseFloat(currentData.temp_f) - 32) * 5/9;
+    }
+    
+    // Ensure temperature is reasonable (between -50 and +60°C)
+    if (temperature < -50 || temperature > 60) {
+      console.warn('Unreasonable temperature detected:', temperature, '°C, using fallback');
+      temperature = 20; // Fallback to reasonable temperature
+    }
+    
     return {
       temperature: {
-        value: Math.round(currentData.temp_c * 10) / 10,
+        value: Math.round(temperature * 10) / 10,
         unit: '°C'
       },
-      humidity: Math.round(currentData.humidity * 10) / 10,
-      windSpeed: Math.round(currentData.wind_kph),
-      windDirection: currentData.wind_degree,
-      visibility: Math.round(currentData.vis_km * 10) / 10,
-      cloudCover: currentData.cloud,
-      condition: currentData.condition.text,
-      timestamp: currentData.last_updated_epoch * 1000
+      humidity: Math.round((currentData.humidity || 0) * 10) / 10,
+      windSpeed: Math.round(currentData.wind_kph || 0),
+      windDirection: currentData.wind_degree || 0,
+      visibility: Math.round((currentData.vis_km || 10) * 10) / 10,
+      cloudCover: currentData.cloud || 0,
+      condition: currentData.condition?.text || 'Unknown',
+      timestamp: (currentData.last_updated_epoch || Date.now() / 1000) * 1000
     };
   }
 
