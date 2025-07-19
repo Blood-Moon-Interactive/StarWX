@@ -4,6 +4,8 @@ import { WeatherService } from './weatherService.js';
 import ISSService from './issService.js';
 import SunriseService from './sunriseService.js';
 import './copernicusService.js';
+import './launchService.js';
+import CelestialService from './celestialService.js';
 
 class StarWXApp {
   constructor() {
@@ -12,6 +14,8 @@ class StarWXApp {
     this.issService = new ISSService();
     this.sunriseService = new SunriseService();
     this.copernicusService = new CopernicusService();
+    this.launchService = new LaunchService();
+    this.celestialService = new CelestialService();
     this.currentLocation = null;
     
     this.init();
@@ -861,13 +865,13 @@ class StarWXApp {
     `;
   }
 
-  async loadLaunches() {
+  async loadLaunches(startDate = null, endDate = null) {
     try {
       console.log('Loading launches...');
       
-      // For now, we'll show a placeholder since we don't have a launch API yet
-      // In the future, this would integrate with SpaceX API or similar
-      this.displayLaunches([]);
+      // Use the LaunchService to fetch real launch data with date filtering
+      const launches = await this.launchService.fetchLaunches(startDate, endDate);
+      this.displayLaunches(launches);
       
     } catch (error) {
       console.error('Error loading launches:', error);
@@ -879,37 +883,8 @@ class StarWXApp {
     const launchesContainer = document.getElementById('launchesContainer');
     if (!launchesContainer) return;
     
-    if (launches.length === 0) {
-      launchesContainer.innerHTML = `
-        <div class="col-12">
-          <div class="text-center py-5">
-            <i class="bi bi-rocket display-1 text-muted"></i>
-            <h4 class="mt-3 text-muted">No Upcoming Launches</h4>
-            <p class="text-muted">Check back later for upcoming space launches.</p>
-          </div>
-        </div>
-      `;
-    } else {
-      // Display actual launches when available
-      let launchesHTML = '';
-      launches.forEach(launch => {
-        launchesHTML += `
-          <div class="col-lg-6 col-md-12 mb-4">
-            <div class="card h-100">
-              <div class="card-body">
-                <h5 class="card-title">${launch.name}</h5>
-                <p class="card-text">${launch.description}</p>
-                <div class="launch-details">
-                  <small class="text-muted">Launch Date: ${launch.date}</small><br>
-                  <small class="text-muted">Mission: ${launch.mission}</small>
-                </div>
-              </div>
-            </div>
-          </div>
-        `;
-      });
-      launchesContainer.innerHTML = launchesHTML;
-    }
+    // Use the LaunchService to generate HTML
+    launchesContainer.innerHTML = this.launchService.getAllLaunchesHtml();
   }
 
   displayLaunchesError() {
@@ -1441,14 +1416,18 @@ class StarWXApp {
       console.log('Date range for dashboard:', { startDate, endDate });
       
       // Load all data in parallel
-      const [spaceWeather, enhancedEvents, launches, issPosition] = await Promise.all([
+      const [spaceWeather, enhancedEvents, launches, issPosition, celestialData] = await Promise.all([
         this.nasaService.getSpaceWeatherEvents(),
         this.nasaService.getEnhancedAstronomicalEvents(startDate, endDate, this.currentLocation),
-        this.loadLaunches(),
-        this.issService.getCurrentISSPosition()
+        this.launchService.fetchLaunches(startDate, endDate),
+        this.issService.getCurrentISSPosition(),
+        this.celestialService.getVisibleTonight(
+          this.currentLocation?.lat || 40.7128, 
+          this.currentLocation?.lon || -74.0060
+        )
       ]);
       
-      this.displayDashboardContent(spaceWeather, enhancedEvents, launches, issPosition);
+      this.displayDashboardContent(spaceWeather, enhancedEvents, launches, issPosition, celestialData);
       
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -1456,7 +1435,7 @@ class StarWXApp {
     }
   }
 
-  displayDashboardContent(spaceWeather, enhancedEvents, launches, issPosition) {
+  displayDashboardContent(spaceWeather, enhancedEvents, launches, issPosition, celestialData) {
     console.log('Displaying dashboard content with new layout...');
     
     // Update ISS Status in the right column
@@ -1467,32 +1446,24 @@ class StarWXApp {
     
     // Update Astronomical Events in the right column
     const astronomicalEvents = document.getElementById('astronomicalEvents');
-    if (astronomicalEvents && enhancedEvents && enhancedEvents.length > 0) {
+    if (astronomicalEvents && enhancedEvents) {
       astronomicalEvents.innerHTML = this.getCompactEventsHtml(enhancedEvents);
     }
     
-    // Update dashboard content for launches and other full-width content
+    // Update dashboard content for launches and celestial data
     const dashboardContent = document.getElementById('dashboardContent');
     if (dashboardContent) {
-      let contentHTML = '';
+      let html = '';
       
-      // Add launches
-      if (launches && launches.length > 0) {
-        contentHTML += this.getLaunchesDashboardHTML(launches);
+      // Add celestial data if available
+      if (celestialData) {
+        html += this.celestialService.getCelestialHTML(celestialData);
       }
       
-      // If no content, show message
-      if (!contentHTML) {
-        contentHTML = `
-          <div class="text-center py-4">
-            <i class="bi bi-rocket display-4 text-muted"></i>
-            <h4 class="mt-3 text-muted">Space Launches</h4>
-            <p class="text-muted">No planned launches found for your selected date range. Try adjusting the date filter to see upcoming space missions.</p>
-          </div>
-        `;
-      }
+      // Add launch data
+      html += this.launchService.getAllLaunchesHtml();
       
-      dashboardContent.innerHTML = contentHTML;
+      dashboardContent.innerHTML = html;
     }
     
     console.log('Dashboard content updated with new layout');
@@ -1741,42 +1712,8 @@ class StarWXApp {
   }
 
   getLaunchesDashboardHTML(launches) {
-    let launchesHTML = `
-      <div class="row mb-4">
-        <div class="col-12">
-          <div class="card">
-            <div class="card-header bg-warning text-dark">
-              <h6 class="card-title mb-0">
-                <i class="bi bi-rocket"></i> Upcoming Launches
-              </h6>
-            </div>
-            <div class="card-body">
-              <div class="row">
-    `;
-    
-    launches.slice(0, 3).forEach(launch => {
-      launchesHTML += `
-        <div class="col-lg-4 col-md-6 mb-3">
-          <div class="card h-100">
-            <div class="card-body">
-              <h6 class="card-title">${launch.name}</h6>
-              <p class="card-text">${launch.description}</p>
-              <small class="text-muted d-block">${launch.date}</small>
-            </div>
-          </div>
-        </div>
-      `;
-    });
-    
-    launchesHTML += `
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    return launchesHTML;
+    // Use the LaunchService to generate dashboard HTML
+    return this.launchService.getAllLaunchesHtml();
   }
 
 
